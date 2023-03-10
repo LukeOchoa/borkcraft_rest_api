@@ -661,6 +661,40 @@ func get_nether_portal_image_names(writer http.ResponseWriter, request *http.Req
         db.Close()
 }
 
+func delete_image_from_client(writer http.ResponseWriter, request *http.Request) {
+
+	body, err := ioutil.ReadAll(request.Body)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var imageDetails ImageDetails
+	err = json.Unmarshal(body, &imageDetails)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	db, err := create_DB_Connection()
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	sql := fmt.Sprintf(`
+		DELETE FROM netherportal_images WHERE name='%s';
+	`, imageDetails.Name)
+	_, err = db.Exec(sql)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	
+	fmt.Printf("The image: -> |%s| was successfully deleted", imageDetails.Name)
+	writer.WriteHeader(http.StatusAccepted)
+}
+
 func doNothing(w http.ResponseWriter, r *http.Request) {}
 func main() {
 	var OpeningMessage = "Server running on localhost:8334..." 
@@ -677,6 +711,8 @@ func main() {
 	http.HandleFunc("/savenetherportaltextchanges", save_nether_portal_text_changes) // Save nether portal text changes
 	http.HandleFunc("/getnetherportalstextinformation", get_nether_portals_text_information)
 	http.HandleFunc("/getnetherportalimagenames", get_nether_portal_image_names)
+
+	http.HandleFunc("/deleteimagefromclient", delete_image_from_client)
 
 	http.HandleFunc("/getaccessrights", get_access_rights)
 	http.HandleFunc("/sessiontimeleft", session_time_left)
