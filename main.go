@@ -23,7 +23,8 @@ type Profile struct {
 	Password   string
 	SessionKey string
 }
-func (profile *Profile) Decode(reader io.Reader) error{
+
+func (profile *Profile) Decode(reader io.Reader) error {
 	decoder := json.NewDecoder(reader)
 	err := decoder.Decode(&profile)
 
@@ -79,12 +80,12 @@ func (netherPortal *NetherPortal) to_slice_of_string() []string {
 	return values
 }
 
-func (netherPortal *NetherPortal) to_formated_string() string{
+func (netherPortal *NetherPortal) to_formated_string() string {
 	values := netherPortal.to_slice_of_string()
 
 	var the_string string
 
-	var len = len(values) -1
+	var len = len(values) - 1
 	for i, v := range values {
 		if len != i {
 			the_string = the_string + fmt.Sprintf("'%s', ", v)
@@ -97,8 +98,8 @@ func (netherPortal *NetherPortal) to_formated_string() string{
 }
 
 type ImageDetails struct {
-	Id 		  int
-	Name 	  string
+	Id        int
+	Name      string
 	True_Name string
 	Username  string
 }
@@ -125,12 +126,26 @@ func (im *ImageDetails) Insert_in_db() errorc.ErrorComplex {
 	return errorc.Nil()
 }
 
+func refresh_session(username string) (string, int) {
+	err := delete_session(username)
+	if err != nil {
+		return "", http.StatusInternalServerError
+	}
+
+	session_key, err := createSessionKey(username)
+	if err != nil {
+		return "", http.StatusForbidden
+	}
+
+	return session_key, 0
+}
+
 func login(writer http.ResponseWriter, request *http.Request) {
 	var profile Profile
 	profile.Decode(request.Body)
 
 	// Check if the given username exists
-	booly, err := checkIfExists("userprofile", "username", profile.Username) 
+	booly, err := checkIfExists("userprofile", "username", profile.Username)
 	if err != nil {
 		fmt.Println("failed to get username.")
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -166,6 +181,7 @@ func login(writer http.ResponseWriter, request *http.Request) {
 
 	var session_key string
 	if !booly {
+		fmt.Println("Existsing Session")
 		// If the user doesnt have a session
 
 		// Create a session key & push it to the Database
@@ -176,19 +192,27 @@ func login(writer http.ResponseWriter, request *http.Request) {
 			return
 		}
 
-	} 
+	} else {
+		// Delete the old session and just give another
+		fmt.Println("Refreshed Session")
+		var code int
+		session_key, code = refresh_session(profile.Username)
+		if code != 0 {
+			writer.WriteHeader(code)
+			return
+		}
+	}
 
 	// Get the session time
 	time_string, err := selectFromDB("expiration", "native_user_keys", "username", profile.Username)
 	if err != nil {
-		fmt.Println("9")
 		writer.WriteHeader(http.StatusForbidden)
 		return
 	}
+
 	// Convert it to a real "Time" object
 	the_time, err := time.Parse(RFC3339, time_string)
 	if err != nil {
-		fmt.Println("8")
 		writer.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -218,7 +242,7 @@ func login(writer http.ResponseWriter, request *http.Request) {
 
 	// Create a object detailing the time to send to the client
 	var message = map[string]interface{}{
-		"key": session_key,
+		"key":  session_key,
 		"time": session_time_to_map(the_time),
 	}
 	r, err := json.Marshal(message)
@@ -228,6 +252,7 @@ func login(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	fmt.Println(message)
 	writer.WriteHeader(http.StatusAccepted)
 	writer.Write(r)
 }
@@ -239,7 +264,7 @@ func logout(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		fmt.Println("error:", err)
 		writer.WriteHeader(http.StatusInternalServerError)
-		return 
+		return
 	}
 
 	booly, err := checkIfExists("native_user_keys", "sessionid", body.Session_Key)
@@ -270,11 +295,11 @@ func add_nether_portal_text(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	var o Occur = Occur{
-		table: "netherportals",
-		column:  "username",
+		table:    "netherportals",
+		column:   "username",
 		group_by: "username",
 	}
-	count, err :=  o.count_occurance_in_db() //count_occurance_in_db("netherportals", "username", nether_portal.Username)
+	count, err := o.count_occurance_in_db() // count_occurance_in_db("netherportals", "username", nether_portal.Username)
 	if err != nil {
 		fmt.Println(err)
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -312,15 +337,15 @@ func add_nether_portal_image_details(writer http.ResponseWriter, request *http.R
 	}
 	defer db.Close()
 
-	// Check if user has > 10(the max amount allowed: 10) db columns
+	// Check if user has > 10 (the max amount allowed: 10) db columns
 	var o Occur = Occur{
-		table: "netherportal_images",
-		column: "true_name",
-		where: "username",
+		table:     "netherportal_images",
+		column:    "true_name",
+		where:     "username",
 		where_con: image_details.Name,
-		group_by: "true_name",
+		group_by:  "true_name",
 	}
-	count, err := o.count_occurance_in_db() 
+	count, err := o.count_occurance_in_db()
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
@@ -345,7 +370,7 @@ func add_nether_portal_image_details(writer http.ResponseWriter, request *http.R
 func save_nether_portal_text_changes(writer http.ResponseWriter, request *http.Request) {
 
 	// Convert response from (Request) to (NetherPortal Object)
-	
+
 	// To []bytes from *http.Request
 	body, err := ioutil.ReadAll(request.Body)
 	if err != nil {
@@ -395,18 +420,18 @@ func get_nether_portals_text_information(writer http.ResponseWriter, request *ht
 
 	// Query Databse
 	rows, err := db.Query(sql)
-	if err != nil { 
+	if err != nil {
 		fmt.Println("get_nether_portals_text_information() query failed...\n", err)
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	// Create a container for all NetherPortals to be sent back 
+	// Create a container for all NetherPortals to be sent back
 	// Create a key for hashmap
 	var nether_portal NetherPortal
 	nether_portals := make(map[string]NetherPortal, 5)
 	hashmap_key, err := strconv.Atoi(orderby)
-	if err != nil { 
+	if err != nil {
 		fmt.Println("get_nether_portals_text_information() convertion failed...", err)
 		writer.WriteHeader(http.StatusBadRequest)
 		return
@@ -415,7 +440,7 @@ func get_nether_portals_text_information(writer http.ResponseWriter, request *ht
 	// Reem through and assign nether portals to container
 	for rows.Next() {
 		err = nether_portal.scan_rows_to_nether_portal(rows)
-		if err != nil { 
+		if err != nil {
 			fmt.Println("failed to scan row in get_nether_portals_text_information()...\n", err)
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
@@ -436,6 +461,7 @@ func get_nether_portals_text_information(writer http.ResponseWriter, request *ht
 
 	fmt.Println("netherportal text payload:   \n", nether_portals)
 	// On Success
+	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusAccepted)
 	writer.Write(json_nether_portals)
 }
@@ -465,11 +491,12 @@ func get_access_rights(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	// Convert query to JSON
-	var access_rights_map = map[string][]string {
+	var access_rights_map = map[string][]string{
 		"access_rights": access_rights,
 	}
 	your_moms_payload, err := json.Marshal(access_rights_map)
 	if err != nil {
+		fmt.Println("Your mom's payload failed?")
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -479,8 +506,6 @@ func get_access_rights(writer http.ResponseWriter, request *http.Request) {
 	writer.WriteHeader(http.StatusAccepted)
 	writer.Write(your_moms_payload)
 }
-
-
 
 func session_time_left(writer http.ResponseWriter, request *http.Request) {
 	fmt.Println("session_time_left")
@@ -536,28 +561,102 @@ func session_time_left(writer http.ResponseWriter, request *http.Request) {
 		theTimeMap := getSessionTimeToMap(theTime)
 		theTimeNowMap := getSessionTimeToMap(time.Now())
 
-		// count the difference for each second, minute, hour key in the (time map)
-		for key := range theTimeNowMap {
-			left, err := strconv.Atoi(theTimeMap[key])
+		// You logged in @ 5:30
+
+		// Your session expires @ in (your session) + (5 minutes)
+
+		// if (time.Now()) IS GREATER THAN (your session) + (5 minutes)
+
+		if time.Now().After(theTime.Add(session_length())) {
+			delete_session_line := fmt.Sprintf("DELETE FROM native_user_keys WHERE sessionid='%s';", key.Key)
+			db, err := create_DB_Connection()
 			if err != nil {
 				writer.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 
-			right, err := strconv.Atoi(theTimeNowMap[key])
+			_, err = db.Exec(delete_session_line)
 			if err != nil {
 				writer.WriteHeader(http.StatusInternalServerError)
+				fmt.Printf("SESSION KEY: %s\n", key.Key)
 				return
 			}
-			// assign the time difference to the (time map)
-			theTimeMap[key] = strconv.Itoa(left - right)
+		} else {
+			for mapkey := range theTimeNowMap {
+				left, err := strconv.Atoi(theTimeMap[mapkey])
+				if err != nil {
+					writer.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+
+				right, err := strconv.Atoi(theTimeNowMap[mapkey])
+				if err != nil {
+					writer.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				theTimeMap[mapkey] = strconv.Itoa(left - right)
+			}
+
 		}
+
+		//
+		//if theTime.Add(time.Second * 90).Aft
+		//// count the difference for each second, minute, hour key in the (time map)
+		//for mapkey := range theTimeNowMap {
+		//	left, err := strconv.Atoi(theTimeMap[mapkey])
+		//	if err != nil {
+		//		writer.WriteHeader(http.StatusInternalServerError)
+		//		return
+		//	}
+
+		//	right, err := strconv.Atoi(theTimeNowMap[mapkey])
+		//	if err != nil {
+		//		writer.WriteHeader(http.StatusInternalServerError)
+		//		return
+		//	}
+		//	// assign the time difference to the (time map)
+		//	if mapkey == "second" && (left-right) < 1 {
+		//		delete_session_line := fmt.Sprintf("DELETE FROM native_user_keys WHERE sessionid='%s';", key.Key)
+		//		db, err := create_DB_Connection()
+		//		if err != nil {
+		//			writer.WriteHeader(http.StatusInternalServerError)
+		//			return
+		//		}
+
+		//		_, err = db.Exec(delete_session_line)
+		//		if err != nil {
+		//			writer.WriteHeader(http.StatusInternalServerError)
+		//			fmt.Printf("SESSION KEY: %s\n", key.Key)
+		//			return
+		//		}
+
+		//		key.Key = ""
+		//		fmt.Printf("\nwe broke, Place|%s|, Left|%d| ---- Right|%d|", mapkey, left, right)
+		//		break
+		//	}
+
+		//	theTimeMap[mapkey] = strconv.Itoa(left - right)
+		//}
 		// copy map over so we can send it to the Client
 		sessionTime = theTimeMap
 	}
 
-	// Convert SessionTime to JSON
-	theTimeJson, err := json.Marshal(sessionTime)
+	//// Convert SessionTime to JSON
+	//theTimeJson, err := json.Marshal(sessionTime)
+	//if err != nil {
+	//	writer.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
+
+	// Create a session object WITH a UPDATED key (very imporant!!!)
+	var theSessionObject = map[string]interface{}{
+		"key":  key.Key,
+		"time": sessionTime,
+	}
+
+	//fmt.Println("The Session Object\n", theSessionObject)
+	// Convert to JSON
+	theSessionObjectJSON, err := json.Marshal(theSessionObject)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
@@ -565,7 +664,7 @@ func session_time_left(writer http.ResponseWriter, request *http.Request) {
 
 	// On Success
 	writer.WriteHeader(http.StatusAccepted)
-	writer.Write(theTimeJson)
+	writer.Write(theSessionObjectJSON)
 }
 
 func basic_message(writer http.ResponseWriter, request *http.Request) {
@@ -601,7 +700,6 @@ func test_connection(writer http.ResponseWriter, request *http.Request) {
 	}
 	defer db.Close()
 
-
 	writer.Header().Set("Content-Type", "application/json")
 	writer.Write(message)
 
@@ -610,55 +708,67 @@ func test_connection(writer http.ResponseWriter, request *http.Request) {
 func get_nether_portal_image_names(writer http.ResponseWriter, request *http.Request) {
 	db, err := create_DB_Connection()
 	if err != nil {
-                writer.WriteHeader(http.StatusInternalServerError)
-                return
-        }
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-
-        sql_read := fmt.Sprintf("SELECT * FROM netherportal_images WHERE true_name='%s';", request.URL.Query()["true_name"][0])
-        type ImageName struct {
-                Id        int
-                Name      string
-                True_name string
-                Username  string
-        }
-        imageNames := make(map[int]ImageName)
+	sql_read := fmt.Sprintf("SELECT * FROM netherportal_images WHERE true_name='%s';", request.URL.Query()["true_name"][0])
+	type ImageName struct {
+		Id        int
+		Name      string
+		True_name string
+		Username  string
+	}
+	imageNames := make(map[int]ImageName)
 	rows, err := db.Query(sql_read)
 	if err != nil {
-                writer.WriteHeader(http.StatusInternalServerError)
-                return
-        }
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
-
-        
 	for rows.Next() {
-                var imageName ImageName
-                err = rows.Scan(
-                        &imageName.Id,
-                        &imageName.Name,
-                        &imageName.True_name,
-                        &imageName.Username,
-                )
-                imageNames[imageName.Id] = imageName
+		var imageName ImageName
+		err = rows.Scan(
+			&imageName.Id,
+			&imageName.Name,
+			&imageName.True_name,
+			&imageName.Username,
+		)
+		imageNames[imageName.Id] = imageName
 		if err != nil {
-                	writer.WriteHeader(http.StatusInternalServerError)
-                	return
-        	}
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
+	}
 
-        }
-
-        someImageNames, err := json.Marshal(&imageNames)
+	someImageNames, err := json.Marshal(&imageNames)
 	if err != nil {
-                writer.WriteHeader(http.StatusInternalServerError)
-                return
-        }
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Write(someImageNames)
+	db.Close()
+}
 
+func nether_portals_estimated_amount(writer http.ResponseWriter, request *http.Request) {
+	number_of_rows_in_table, err := rows_in_a_table("netherportals")
 
-        writer.Header().Set("Content-Type", "application/json")
-        writer.Write(someImageNames)
-        db.Close()
+	payload := map[string]int{
+		"count": number_of_rows_in_table,
+	}
+
+	json_payload, err := json.Marshal(payload)
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Write(json_payload)
+
 }
 
 func delete_image_from_client(writer http.ResponseWriter, request *http.Request) {
@@ -697,14 +807,14 @@ func delete_image_from_client(writer http.ResponseWriter, request *http.Request)
 
 func doNothing(w http.ResponseWriter, r *http.Request) {}
 func main() {
-	var OpeningMessage = "Server running on localhost:8334..." 
+	var OpeningMessage = "Server running on localhost:8334..."
 	fmt.Println(OpeningMessage)
 
 	http.HandleFunc("/favicon.ico", doNothing)
 	http.HandleFunc("/", test_connection)
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/logout", logout)
-	
+
 	http.HandleFunc("/addnetherportaltext", add_nether_portal_text)
 	http.HandleFunc("/addnetherportalimagedetails", add_nether_portal_image_details)
 
@@ -717,6 +827,7 @@ func main() {
 	http.HandleFunc("/getaccessrights", get_access_rights)
 	http.HandleFunc("/sessiontimeleft", session_time_left)
 
+	http.HandleFunc("/netherportalsestimatedamount", nether_portals_estimated_amount)
+
 	http.ListenAndServe(":8334", nil)
 }
-

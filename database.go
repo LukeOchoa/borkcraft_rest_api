@@ -15,23 +15,25 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+//	host     = "borkcraft-info.cc9gxx4itgmz.us-west-1.rds.amazonaws.com"
+//	userx 	 = "borker"
+//	password = "3CgE4wgUdhTA$#"
+
+//	const (
+//		host     = "localhost"
+//		port     = 5432
+//		userx    = "luke"
+//		password = "free144"
+//		dbname   = "breaker"
+//	)
 
 const (
-	
-	host     = "borkcraft-info.cc9gxx4itgmz.us-west-1.rds.amazonaws.com"
+	host     = "localhost"
 	port     = 5432
-	userx 	 = "borker"
-	password = "3CgE4wgUdhTA$#"
-	dbname 	 = "breaker"
+	userx    = "luke"
+	password = "free144"
+	dbname   = "breaker"
 )
-
-//const (
-//	host     = "localhost"
-//	port     = 5432
-//	userx    = "luke"
-//	password = "free144"
-//	dbname   = "breaker"
-//)
 
 func create_DB_Connection() (*sql.DB, error) {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
@@ -53,9 +55,10 @@ func create_DB_Connection() (*sql.DB, error) {
 
 type ID struct {
 	number int
-	text string
+	text   string
 }
-func newID() ID{
+
+func newID() ID {
 	return ID{number: 0, text: ""}
 }
 
@@ -67,7 +70,7 @@ type SessionKey struct {
 	Username   string
 }
 
-func getValidID(dbName string) (ID, error){
+func getValidID(dbName string) (ID, error) {
 	db, err := create_DB_Connection()
 	if err != nil {
 		return newID(), err
@@ -111,11 +114,10 @@ func getValidID(dbName string) (ID, error){
 		booly = false
 	}
 
-
 	var id = ID{
 		number: lowestNewValue,
-		text: strconv.Itoa(lowestNewValue),
-	}	
+		text:   strconv.Itoa(lowestNewValue),
+	}
 
 	return id, nil
 }
@@ -135,7 +137,7 @@ func checkIfExists(table, column, value string) (bool, error) {
 	if err != nil {
 		fmt.Println("db sql failed")
 		return false, err
-	} 
+	}
 
 	return available, nil
 }
@@ -158,22 +160,22 @@ func selectFromDB(column, table, condition, where_condition string) (string, err
 }
 
 func delete_session(username string) error {
-		// if session is expired, renew it
-		sql := fmt.Sprintf(
-			`DELETE FROM native_user_keys WHERE username='%s';`, username)
-		db, err := create_DB_Connection()
-		if err != nil {
-			fmt.Println("db connect failed x")
-			return err
-		}
-		defer db.Close()
-		_, err = db.Exec(sql)
-		if err != nil {
-			fmt.Println("failed to execute sql @ delete session")
-			return err
-		}
+	// if session is expired, renew it
+	sql := fmt.Sprintf(
+		`DELETE FROM native_user_keys WHERE username='%s';`, username)
+	db, err := create_DB_Connection()
+	if err != nil {
+		fmt.Println("db connect failed x")
+		return err
+	}
+	defer db.Close()
+	_, err = db.Exec(sql)
+	if err != nil {
+		fmt.Println("failed to execute sql @ delete session")
+		return err
+	}
 
-		return nil
+	return nil
 }
 
 func createSessionKey(username string) (string, error) {
@@ -183,21 +185,20 @@ func createSessionKey(username string) (string, error) {
 		return "", err
 	}
 
-	var sessionTime = time.Second * 90 
 	sk := SessionKey{
-		Id: id.text,
-		SessionID: uuid.NewV4().String(),
+		Id:         id.text,
+		SessionID:  uuid.NewV4().String(),
 		LastActive: time.Now().Format(RFC3339),
-		Expiration: time.Now().Add(sessionTime).Format(RFC3339),
-		Username: username,
+		Expiration: time.Now().Add(session_length()).Format(RFC3339),
+		Username:   username,
 	}
 
 	columns := "id, sessionid, lastactive, expiration, username"
-	values := fmt.Sprintf(`'%s', '%s', '%s', '%s', '%s'`, 
+	values := fmt.Sprintf(`'%s', '%s', '%s', '%s', '%s'`,
 		sk.Id, sk.SessionID, sk.LastActive, sk.Expiration, sk.Username)
 	sql := fmt.Sprintf(
 		`INSERT INTO %s(%s) VALUES(%s);`, "native_user_keys", columns, values)
-	
+
 	db, err := create_DB_Connection()
 	if err != nil {
 		fmt.Println("createSessionKey db connect fail")
@@ -211,9 +212,9 @@ func createSessionKey(username string) (string, error) {
 		return "", err
 	}
 
-
 	return sk.SessionID, nil
 }
+
 func session_time_to_map(theTime time.Time) map[string]string {
 	second := strconv.Itoa(theTime.Second())
 	minute := strconv.Itoa(theTime.Minute())
@@ -228,18 +229,19 @@ func session_time_to_map(theTime time.Time) map[string]string {
 	return sessionTime
 }
 
-//func count_occurance_in_db(table, column, group_by, where, where_con string) (int, error) {
+// func count_occurance_in_db(table, column, group_by, where, where_con string) (int, error) {
 type Occur struct {
-	table     string 
-	column    string 
-	group_by  string 
-	where     string   
+	table     string
+	column    string
+	group_by  string
+	where     string
 	where_con string
 }
+
 func (o *Occur) count_occurance_in_db() (int, error) {
 	// sql := `SELECT '%s', count('%s') FROM '%s' GROUP BY '%s'`, column, column, table, group_by)
 
-	select_from:= fmt.Sprintf(
+	select_from := fmt.Sprintf(
 		`SELECT '%s', count('%s') FROM %s`, o.column, o.column, o.table)
 
 	group_by := fmt.Sprintf(" GROUP BY %s", o.group_by)
@@ -266,11 +268,10 @@ func (o *Occur) count_occurance_in_db() (int, error) {
 		return 0, err
 	}
 
-
 	return count, nil
 }
 
-func (nether_portal *NetherPortal) update_nether_portal_text_in_db() errorc.ErrorComplex{
+func (nether_portal *NetherPortal) update_nether_portal_text_in_db() errorc.ErrorComplex {
 
 	// Define Variables
 	var table = "netherportals"
@@ -283,7 +284,7 @@ func (nether_portal *NetherPortal) update_nether_portal_text_in_db() errorc.Erro
 	where := fmt.Sprintf("WHERE id = %s;", strconv.Itoa(nether_portal.Id))
 
 	// Formating
-	for i:=0; i<16; i++{ // format together all "Set column1 = value1" data from (columns) and (values)
+	for i := 0; i < 16; i++ { // format together all "Set column1 = value1" data from (columns) and (values)
 		if i < 7 { // integers are not wrapped
 			set = set + fmt.Sprintf("%s = %s, ", columns[i], values[i])
 		} else {
@@ -311,7 +312,7 @@ func (nether_portal *NetherPortal) update_nether_portal_text_in_db() errorc.Erro
 	return errorc.Nil()
 }
 
-func (nether_portal *NetherPortal) scan_rows_to_nether_portal(rows *sql.Rows) error{
+func (nether_portal *NetherPortal) scan_rows_to_nether_portal(rows *sql.Rows) error {
 	err := rows.Scan(
 		&nether_portal.Id,
 		&nether_portal.OverWorld.Xcord,
@@ -363,6 +364,22 @@ func (nether_portal *NetherPortal) insert_nether_portal_text_to_db() error {
 	return nil
 }
 
+func rows_in_a_table(table string) (int, error) {
+	db, err := create_DB_Connection()
+	if err != nil {
+		panic(err)
+	}
+
+	sql := fmt.Sprintf("Select count(*) AS exact_count FROM public.%s;", table)
+	var number_of_rows_in_table int
+	err = db.QueryRow(sql).Scan(&number_of_rows_in_table)
+	if err != nil {
+		return 0, err
+	}
+
+	return number_of_rows_in_table, nil
+}
+
 func getSessionTimeToMap(theTime time.Time) map[string]string {
 	second := strconv.Itoa(theTime.Second())
 	minute := strconv.Itoa(theTime.Minute())
@@ -377,7 +394,7 @@ func getSessionTimeToMap(theTime time.Time) map[string]string {
 	return sessionTime
 }
 
-func unmarshal_readCloser[T io.ReadCloser, S any](reader T) (S, error){
+func unmarshal_readCloser[T io.ReadCloser, S any](reader T) (S, error) {
 	var s S
 
 	body, err := ioutil.ReadAll(reader)
