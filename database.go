@@ -408,3 +408,46 @@ func unmarshal_readCloser[T io.ReadCloser, S any](reader T) (S, error) {
 
 	return s, nil
 }
+
+func (nether_portal *NetherPortal) update_nether_portal_text_in_db2() errorc.ErrorComplex {
+
+	// Define Variables
+	var table = "netherportals"
+	var columns = []string{"id", "xcord_overworld", "ycord_overworld", "zcord_overworld", "xcord_nether", "ycord_nether", "zcord_nether", "local_overworld", "owner_overworld", "notes_overworld", "overworld_true_name", "local_nether", "owner_nether", "notes_nether", "nether_true_name", "username"}
+	var values = nether_portal.to_slice_of_string()
+
+	// Create SQL statements
+	update := fmt.Sprintf(`UPDATE %s `, table)
+	set := "SET "
+	where := fmt.Sprintf("WHERE nether_true_name = %s;", nether_portal.Nether.True_Name)
+
+	// Formating
+	for i := 0; i < 16; i++ { // format together all "Set column1 = value1" data from (columns) and (values)
+		if i != 0 {
+			if i < 7 { // integers are not wrapped
+				set = set + fmt.Sprintf("%s = %s, ", columns[i], values[i])
+			} else {
+				if i == 15 { // last sprintf shouldn't have a comma(,)
+					set = set + fmt.Sprintf("%s = '%s' ", columns[i], values[i])
+				} else {
+					set = set + fmt.Sprintf("%s = '%s', ", columns[i], values[i])
+				}
+			}
+		}
+	}
+
+	// Open/Close Connection
+	db, err := create_DB_Connection()
+	if err != nil {
+		return errorc.New(http.StatusInternalServerError, "", err)
+	}
+	defer db.Close()
+
+	// Execute SQL
+	_, err = db.Exec(update + set + where)
+	if err != nil {
+		return errorc.New(http.StatusBadRequest, "", err)
+	}
+
+	return errorc.Nil()
+}

@@ -390,7 +390,7 @@ func save_nether_portal_text_changes(writer http.ResponseWriter, request *http.R
 	}
 
 	// Update database
-	errc := nether_portal.update_nether_portal_text_in_db()
+	errc := nether_portal.update_nether_portal_text_in_db2()
 	if errc.Err != nil {
 		fmt.Println("failed to upate (nether portal text)\n ->: ", errc.Err)
 		writer.WriteHeader(errc.Code)
@@ -800,10 +800,69 @@ func delete_image_from_client(writer http.ResponseWriter, request *http.Request)
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	
+
 	fmt.Printf("The image: -> |%s| was successfully deleted", imageDetails.Name)
 	writer.WriteHeader(http.StatusAccepted)
 }
+
+//func get_nether_portals_text_information_2(writer http.ResponseWriter, request *http.Request) {
+//	// Open/Close connection
+//	db, err := create_DB_Connection()
+//	if err != nil {
+//		fmt.Println("Database connection failed in get_nether_portals_text_information()... ->:\n", err)
+//		writer.WriteHeader(http.StatusInternalServerError)
+//		return
+//	}
+//
+//	// Define Variables
+//	var orderby string = request.URL.Query()["offset"][0]
+//	var limit string = request.URL.Query()["limit"][0]
+//
+//	// Format SQL Statement
+//	sql := fmt.Sprintf(`SELECT * FROM netherportals WHERE id > %s ORDER BY id LIMIT %s;`, orderby, limit)
+//
+//	// Query Databse
+//	rows, err := db.Query(sql)
+//	if err != nil {
+//		fmt.Println("get_nether_portals_text_information() query failed...\n", err)
+//		writer.WriteHeader(http.StatusInternalServerError)
+//		return
+//	}
+//
+//	// Create a container for all NetherPortals to be sent back
+//	// Create a key for hashmap
+//	var nether_portal NetherPortal
+//	portal_aggregate := make(map[string]NetherPortal, 5)
+//	hashmap_key, err := strconv.Atoi(orderby)
+//	if err != nil {
+//		fmt.Println("get_nether_portals_text_information() convertion failed...", err)
+//		writer.WriteHeader(http.StatusBadRequest)
+//		return
+//	}
+//
+//	for rows.Next() {
+//		err = nether_portal.scan_rows_to_nether_portal(rows)
+//		if err != nil {
+//			fmt.Println("failed to scan row in get_nether_portals_text_information()...\n", err)
+//			writer.WriteHeader(http.StatusInternalServerError)
+//			return
+//		}
+//
+//		//nether_portals[strconv.Itoa(hashmap_key)] = nether_portal
+//		// map {
+//		// over_world = portal
+//		// }
+//
+//		// map {
+//		// nether = portal
+//		// }
+//
+//
+//		nether_portal = NetherPortal{}
+//		hashmap_key++
+//	}
+//
+//}
 
 func doNothing(w http.ResponseWriter, r *http.Request) {}
 func main() {
