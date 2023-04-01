@@ -4,7 +4,9 @@ import (
 	"borkcraft_rest_api/errorc"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	//"golang.org/x/exp/maps"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -120,6 +122,21 @@ func getValidID(dbName string) (ID, error) {
 	}
 
 	return id, nil
+}
+
+func maker(amount int, to_make string) string {
+	var make string
+	for i := 0; i <= amount; i++ {
+		make = make + to_make
+	}
+
+	return make
+}
+func tabber(amount int) string {
+	return maker(amount, "\t")
+}
+func nliner(amount int) string {
+	return maker(amount, "\n")
 }
 
 func checkIfExists(table, column, value string) (bool, error) {
@@ -409,44 +426,79 @@ func unmarshal_readCloser[T io.ReadCloser, S any](reader T) (S, error) {
 	return s, nil
 }
 
+func rune_to_str(ch byte) string {
+	return fmt.Sprintf("%c", ch)
+}
+func delChar(x string, index int) string {
+	s := []rune(x)
+	s = append(s[0:index], s[index+1:]...)
+
+	return string(s)
+}
+func remove_comma_from_end(str string) string {
+	for i := len(str) - 1; i >= 0; i-- {
+		if rune_to_str(str[i]) == "," {
+			str = delChar(str, i)
+			break
+		}
+	}
+	return str
+}
 func (nether_portal *NetherPortal) update_nether_portal_text_in_db2() errorc.ErrorComplex {
+	fmt.Println("Ping")
 
 	// Define Variables
 	var table = "netherportals"
-	var columns = []string{"id", "xcord_overworld", "ycord_overworld", "zcord_overworld", "xcord_nether", "ycord_nether", "zcord_nether", "local_overworld", "owner_overworld", "notes_overworld", "overworld_true_name", "local_nether", "owner_nether", "notes_nether", "nether_true_name", "username"}
-	var values = nether_portal.to_slice_of_string()
 
-	// Create SQL statements
+	// Create SQL statements // Search by nether_true_name // Change this to be a switch on true_name nether or ow
 	update := fmt.Sprintf(`UPDATE %s `, table)
 	set := "SET "
-	where := fmt.Sprintf("WHERE nether_true_name = %s;", nether_portal.Nether.True_Name)
+	where := fmt.Sprintf("WHERE id = %d;", nether_portal.Id)
 
-	// Formating
-	for i := 0; i < 16; i++ { // format together all "Set column1 = value1" data from (columns) and (values)
-		if i != 0 {
-			if i < 7 { // integers are not wrapped
-				set = set + fmt.Sprintf("%s = %s, ", columns[i], values[i])
-			} else {
-				if i == 15 { // last sprintf shouldn't have a comma(,)
-					set = set + fmt.Sprintf("%s = '%s' ", columns[i], values[i])
-				} else {
-					set = set + fmt.Sprintf("%s = '%s', ", columns[i], values[i])
-				}
-			}
-		}
+	// New Formating
+
+	// Create all SET information
+	all_sets := nether_portal.OverWorld.sql_update_sets("_overworld")
+	fmt.Print("\n\n\n\nOVERWORLD?\n", all_sets)
+
+	nether := nether_portal.Nether.sql_update_sets("_nether")
+	fmt.Print("\n\n\n\nNether?\n", nether)
+
+	//maps.Copy(all_sets, nether)
+	all_sets_list := make([]string, 0)
+	for _, value := range all_sets {
+		push(&all_sets_list, value)
 	}
+	for _, value := range nether {
+		push(&all_sets_list, value)
+	}
+
+	//fmt.Printf("%s%s%s", nliner(3), all_sets, nliner(3))
+	for _, values := range all_sets_list {
+		set = set + values + ", "
+	}
+	set = remove_comma_from_end(set) + " "
 
 	// Open/Close Connection
 	db, err := create_DB_Connection()
 	if err != nil {
+		fmt.Println("db con err")
 		return errorc.New(http.StatusInternalServerError, "", err)
 	}
 	defer db.Close()
-
 	// Execute SQL
-	_, err = db.Exec(update + set + where)
+	changes, err := db.Exec(update + set + where)
 	if err != nil {
+		fmt.Print("\nSQL FAILED:\n", update+set+where)
 		return errorc.New(http.StatusBadRequest, "", err)
+	}
+	change, err := changes.RowsAffected()
+	fmt.Printf("\nAFFECTED ROWS: %d\n", change)
+	if change == 0 {
+		if err != nil {
+			panic(err)
+		}
+		return errorc.New(http.StatusBadRequest, "Could not update row...", errors.New("yes"))
 	}
 
 	return errorc.Nil()

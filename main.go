@@ -54,6 +54,81 @@ type NetherPortal struct {
 	Username  string
 }
 
+func sql_set(name, value, realm string, quotes bool) string {
+	if quotes {
+		value = fmt.Sprintf("'%s'", value)
+	}
+	var set string
+	// I Hate Life
+	if name == "true_name" {
+		realm2 := ""
+		// strip the _(underscore) I Hate Life...
+		for i := range realm {
+			s := string(realm[i])
+			if s != "_" {
+				realm2 = realm2 + s
+			}
+		}
+		set = fmt.Sprintf("%s_%s = %s", realm2, name, value)
+	} else {
+		set = fmt.Sprintf("%s%s = %s", name, realm, value)
+	}
+
+	return set
+}
+
+type SqlUpdate struct {
+	key    string
+	quotes bool // true for yes, false for no
+}
+
+func (su SqlUpdate) new(key string, quotes bool) SqlUpdate {
+	return SqlUpdate{
+		key,
+		quotes,
+	}
+}
+func (p *Portal) keys() []SqlUpdate {
+	var su SqlUpdate
+	var f, t bool = false, true
+	return []SqlUpdate{su.new("xcord", f), su.new("ycord", f), su.new("zcord", f), su.new("local", t), su.new("owner", t), su.new("notes", t), su.new("true_name", t)}
+}
+func push(list *[]string, value interface{}) {
+	var append_me string
+	switch v := value.(type) {
+	case int:
+		append_me = strconv.Itoa(v)
+	case string:
+		append_me = v
+	}
+	*list = append(*list, append_me)
+}
+func (p *Portal) values() []string {
+	portal := make([]string, 0)
+	push(&portal, p.Xcord)
+	push(&portal, p.Ycord)
+	push(&portal, p.Zcord)
+	push(&portal, p.Locale)
+	push(&portal, p.Owner)
+	push(&portal, p.Notes)
+	push(&portal, p.True_Name)
+
+	return portal
+}
+
+func (p *Portal) sql_update_sets(realm string) map[string]string {
+	keys := p.keys()
+	values := p.values()
+
+	update_map := make(map[string]string)
+	for i, su := range keys {
+		set := sql_set(su.key, values[i], realm, su.quotes)
+		update_map[su.key] = set
+	}
+
+	return update_map
+}
+
 func (netherPortal *NetherPortal) to_slice_of_string() []string {
 	values := []string{
 		strconv.Itoa(netherPortal.Id),
@@ -393,6 +468,16 @@ func save_nether_portal_text_changes(writer http.ResponseWriter, request *http.R
 	errc := nether_portal.update_nether_portal_text_in_db2()
 	if errc.Err != nil {
 		fmt.Println("failed to upate (nether portal text)\n ->: ", errc.Err)
+
+		// Create an error message
+		msg := map[string]string{"error": errc.Msg}
+		message, err := json.Marshal(msg)
+		if err != nil {
+			panic(err)
+		}
+
+		// Send the reason why request was/ is bad
+		writer.Write(message)
 		writer.WriteHeader(errc.Code)
 		return
 	}
@@ -863,6 +948,9 @@ func delete_image_from_client(writer http.ResponseWriter, request *http.Request)
 //	}
 //
 //}
+func test(writer http.ResponseWriter, request *http.Request) {
+
+}
 
 func doNothing(w http.ResponseWriter, r *http.Request) {}
 func main() {
