@@ -32,7 +32,7 @@ import (
 const (
 	host     = "localhost"
 	port     = 5432
-	userx    = "luke"
+	userx    = "peony"
 	password = "free144"
 	dbname   = "breaker"
 )
